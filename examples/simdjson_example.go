@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/minio/simdjson-go"
+	"github.com/lgcorzo/simdjson-go"
 )
 
 func printKeyHistogram(pj *simdjson.ParsedJson, key string) (err error) {

@@ -26,7 +26,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	"github.com/klauspost/compress/zstd"
 
-	simdjson "github.com/minio/simdjson-go"
+	simdjson "github.com/lgcorzo/simdjson-go"
 )
 
 func benchmarkEncodingJson(b *testing.B, filename string) {

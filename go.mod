@@ -1,4 +1,4 @@
-module github.com/minio/simdjson-go
+module github.com/lgcorzo/simdjson-go
 
 go 1.18
 
