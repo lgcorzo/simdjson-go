@@ -254,7 +254,7 @@ func TestNdjsonCountWhere(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping... too long")
 	}
-	ndjson := loadFile("testdata/parking-citations.json.zst")
+	ndjson := loadFile(t, "testdata/parking-citations.json.zst")
 	pj, err := ParseND(ndjson, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -322,7 +322,7 @@ func TestNdjsonCountWhere2(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping... too long")
 	}
-	ndjson := loadFile("testdata/RC_2009-01.json.zst")
+	ndjson := loadFile(t, "testdata/RC_2009-01.json.zst")
 	// Test trimming
 	b := make([]byte, 0, len(ndjson)+4)
 	b = append(b, '\n', '\n')
@@ -363,11 +363,12 @@ func TestNdjsonCountWhere2(t *testing.T) {
 	})
 }
 
-func loadFile(filename string) []byte {
+func loadFile(tb testing.TB, filename string) []byte {
+	tb.Helper()
 	if !strings.HasSuffix(filename, ".zst") {
 		ndjson, err := ioutil.ReadFile(filename)
 		if err != nil {
-			panic("Failed to load file")
+			tb.Skipf("Failed to load file %s: %v", filename, err)
 		}
 		return ndjson
 	}
@@ -384,26 +385,33 @@ func loadFile(filename string) []byte {
 			resp, err := http.DefaultClient.Get("https://dl.minio.io/assets/" + filepath.Base(filename))
 			if err == nil && resp.StatusCode == http.StatusOK {
 				b, err := ioutil.ReadAll(resp.Body)
+				resp.Body.Close()
 				if err == nil {
 					err = ioutil.WriteFile(filename, b, os.ModePerm)
 					if err == nil {
 						continue
 					}
-					panic("Failed to write file:" + err.Error())
+					tb.Skipf("Failed to write file: %v", err)
 				}
-				panic("Failed to read file:" + err.Error())
+				tb.Skipf("Failed to read file: %v", err)
 			}
-			panic("Failed to download file:" + err.Error())
+			if resp != nil {
+				resp.Body.Close()
+			}
+			tb.Skipf("Failed to download file %s: %v", filename, err)
+			return nil
 		}
 	}
 	dec, err := zstd.NewReader(f)
 	if err != nil {
-		panic("Failed to create decompressor")
+		tb.Skipf("Failed to create decompressor: %v", err)
+		return nil
 	}
 	defer dec.Close()
 	ndjson, err := ioutil.ReadAll(dec)
 	if err != nil {
-		panic("Failed to load file")
+		tb.Skipf("Failed to load file: %v", err)
+		return nil
 	}
 	return ndjson
 }
@@ -490,7 +498,7 @@ func BenchmarkNdjsonWarmCountStar(b *testing.B) {
 		b.SkipNow()
 	}
 
-	ndjson := loadFile("testdata/parking-citations-1M.json.zst")
+	ndjson := loadFile(b, "testdata/parking-citations-1M.json.zst")
 
 	pj, err := ParseND(ndjson, nil)
 	if err != nil {
@@ -510,7 +518,7 @@ func BenchmarkNdjsonWarmCountStarWithWhere(b *testing.B) {
 		b.SkipNow()
 	}
 
-	ndjson := loadFile("testdata/parking-citations-1M.json.zst")
+	ndjson := loadFile(b, "testdata/parking-citations-1M.json.zst")
 
 	pj, err := ParseND(ndjson, nil)
 	if err != nil {
