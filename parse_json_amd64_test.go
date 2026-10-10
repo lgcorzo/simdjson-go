@@ -78,7 +78,7 @@ func BenchmarkNdjsonStage2(b *testing.B) {
 		b.SkipNow()
 	}
 
-	ndjson := loadFile("testdata/parking-citations-1M.json.zst")
+	ndjson := loadFile(b, "testdata/parking-citations-1M.json.zst")
 	pj := internalParsedJson{}
 
 	b.SetBytes(int64(len(ndjson)))
@@ -96,7 +96,7 @@ func BenchmarkNdjsonStage1(b *testing.B) {
 	if !SupportedCPU() {
 		b.SkipNow()
 	}
-	ndjson := loadFile("testdata/parking-citations-1M.json.zst")
+	ndjson := loadFile(b, "testdata/parking-citations-1M.json.zst")
 
 	pj := internalParsedJson{}
 
@@ -116,7 +116,7 @@ func BenchmarkNdjsonColdCountStar(b *testing.B) {
 	if !SupportedCPU() {
 		b.SkipNow()
 	}
-	ndjson := loadFile("testdata/parking-citations-1M.json.zst")
+	ndjson := loadFile(b, "testdata/parking-citations-1M.json.zst")
 
 	b.SetBytes(int64(len(ndjson)))
 	b.ReportAllocs()
@@ -135,7 +135,7 @@ func BenchmarkNdjsonColdCountStarWithWhere(b *testing.B) {
 	if !SupportedCPU() {
 		b.SkipNow()
 	}
-	ndjson := loadFile("testdata/parking-citations-1M.json.zst")
+	ndjson := loadFile(b, "testdata/parking-citations-1M.json.zst")
 	const want = 110349
 	runtime.GC()
 	pj := internalParsedJson{}

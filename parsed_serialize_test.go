@@ -129,7 +129,7 @@ func BenchmarkSerializeNDJSON(b *testing.B) {
 		b.SkipNow()
 	}
 
-	ndjson := loadFile("testdata/parking-citations-1M.json.zst")
+	ndjson := loadFile(b, "testdata/parking-citations.json.zst")
 
 	pj, err := ParseND(ndjson, nil)
 	if err != nil {
@@ -172,7 +172,7 @@ func BenchmarkDeSerializeNDJSON(b *testing.B) {
 		b.SkipNow()
 	}
 
-	ndjson := loadFile("testdata/parking-citations-1M.json.zst")
+	ndjson := loadFile(b, "testdata/parking-citations-1M.json.zst")
 
 	pj, err := ParseND(ndjson, nil)
 	if err != nil {
@@ -224,7 +224,7 @@ func TestDeSerializeNDJSON(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping... too long")
 	}
-	ndjson := loadFile("testdata/parking-citations.json.zst")
+	ndjson := loadFile(t, "testdata/parking-citations.json.zst")
 
 	pj, err := ParseND(ndjson, nil)
 	if err != nil {
