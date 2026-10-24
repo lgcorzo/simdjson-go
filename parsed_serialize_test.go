@@ -274,6 +274,39 @@ func TestDeSerializeNDJSON(t *testing.T) {
 	})
 }
 
+func TestDeserializeSafety(t *testing.T) {
+	s := NewSerializer()
+
+	// Case 1: Corrupted stream where compressed size varint claims to be larger than input buffer
+	corruptStreamSize := []byte{
+		serializedVersion, // Version
+		0x80, 0x80, 0x80, 0x80, 0x08, // Compressed size varint = 2147483648
+		0x01, // Tape size = 1
+	}
+	_, err := s.Deserialize(corruptStreamSize, nil)
+	if err == nil {
+		t.Error("expected error for stream size larger than input, got nil")
+	}
+
+	// Case 2: Tape size exceeds max block size limit
+	corruptTapeSize := []byte{
+		serializedVersion, // Version
+		0x0A,             // Comp size = 10
+		0xFF, 0xFF, 0xFF, 0xFF, 0x0F, // Tape size = 4294967295
+	}
+	_, err = s.Deserialize(corruptTapeSize, nil)
+	if err == nil {
+		t.Error("expected error for tape size exceeding max, got nil")
+	}
+
+	// Case 3: Invalid version byte
+	invalidVer := []byte{serializedVersion + 1}
+	_, err = s.Deserialize(invalidVer, nil)
+	if err == nil {
+		t.Error("expected error for unsupported version byte, got nil")
+	}
+}
+
 func TestDeSerializeJSON(t *testing.T) {
 	if !SupportedCPU() {
 		t.SkipNow()
