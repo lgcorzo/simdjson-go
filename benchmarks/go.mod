@@ -5,7 +5,7 @@ go 1.25
 require (
 	github.com/buger/jsonparser v1.1.2
 	github.com/json-iterator/go v1.1.12
-	github.com/klauspost/compress v1.20.4-0.20261021155824-62d757cd8e6f
+	github.com/klauspost/compress v1.20.3
 	github.com/minio/simdjson-go v0.0.0-00010101000000-000000000000
 )
 
