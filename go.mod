@@ -1,11 +1,9 @@
 module github.com/minio/simdjson-go
 
-go 1.24
-
-toolchain go1.24.3
+go 1.25
 
 require (
-	github.com/klauspost/compress v1.18.7
+	github.com/klauspost/compress v1.20.3
 	github.com/klauspost/cpuid/v2 v2.2.10
 )
 
