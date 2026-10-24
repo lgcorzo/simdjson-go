@@ -482,11 +482,11 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 	if c, err := binary.ReadUvarint(br); err != nil {
 		return dst, err
 	} else {
-		if int(c) > br.Len() {
+		if c > uint64(br.Len()) {
 			return dst, fmt.Errorf("stream too short, want %d, only have %d left", c, br.Len())
 		}
-		if int(c) > br.Len() {
-			fmt.Println("extra length:", int(c), br.Len())
+		if s.maxBlockSize > 0 && c > s.maxBlockSize {
+			return dst, fmt.Errorf("compressed block size (%d) exceeds max (%d)", c, s.maxBlockSize)
 		}
 	}
 
@@ -494,6 +494,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 	if ts, err := binary.ReadUvarint(br); err != nil {
 		return dst, err
 	} else {
+		if s.maxBlockSize > 0 && ts > s.maxBlockSize/8 {
+			return dst, fmt.Errorf("tape size (%d) exceeds max", ts)
+		}
 		if uint64(cap(dst.Tape)) < ts {
 			dst.Tape = make([]uint64, ts)
 		}
@@ -504,6 +507,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 	if ss, err := binary.ReadUvarint(br); err != nil {
 		return dst, err
 	} else {
+		if s.maxBlockSize > 0 && ss > s.maxBlockSize {
+			return dst, fmt.Errorf("strings size (%d) exceeds max", ss)
+		}
 		if dst.Strings == nil || uint64(cap(dst.Strings.B)) < ss {
 			dst.Strings = &TStrings{B: make([]byte, ss)}
 		}
@@ -522,6 +528,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 	if ss, err := binary.ReadUvarint(br); err != nil {
 		return dst, err
 	} else {
+		if s.maxBlockSize > 0 && ss > s.maxBlockSize {
+			return dst, fmt.Errorf("message size (%d) exceeds max", ss)
+		}
 		if uint64(cap(dst.Message)) < ss || dst.Message == nil {
 			dst.Message = make([]byte, ss)
 		}
@@ -539,6 +548,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 	if tags, err := binary.ReadUvarint(br); err != nil {
 		return dst, err
 	} else {
+		if s.maxBlockSize > 0 && tags > s.maxBlockSize {
+			return dst, fmt.Errorf("tags size (%d) exceeds max", tags)
+		}
 		if uint64(cap(s.tagsBuf)) < tags {
 			s.tagsBuf = make([]byte, tags)
 		}
@@ -557,6 +569,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 	if vals, err := binary.ReadUvarint(br); err != nil {
 		return dst, err
 	} else {
+		if s.maxBlockSize > 0 && vals > s.maxBlockSize {
+			return dst, fmt.Errorf("values size (%d) exceeds max", vals)
+		}
 		if uint64(cap(s.valuesBuf)) < vals {
 			s.valuesBuf = make([]byte, vals)
 		}
@@ -583,7 +598,7 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 	values := s.valuesBuf
 	nSkips := 0
 	for _, t := range s.tagsBuf {
-		if off == len(dst.Tape) {
+		if off >= len(dst.Tape) {
 			return dst, errors.New("tags extended beyond tape")
 		}
 		tag := Tag(t)
@@ -592,6 +607,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 		if nSkips > 0 && tag != TagNop {
 			// We owe skips. Add with jumps
 			for i := 0; i < nSkips; i++ {
+				if off >= len(dst.Tape) {
+					return dst, errors.New("skips extended beyond tape")
+				}
 				dst.Tape[off] = (uint64(TagNop) << JSONTAGOFFSET) | uint64(nSkips-i)
 				off++
 			}
@@ -604,6 +622,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 			if len(values) < 16 {
 				return dst, fmt.Errorf("reading %v: no values left", tag)
 			}
+			if off+1 >= len(dst.Tape) {
+				return dst, errors.New("tag requires 2 tape slots, but extended beyond tape")
+			}
 			sOffset := binary.LittleEndian.Uint64(values[:8])
 			sLen := binary.LittleEndian.Uint64(values[8:16])
 			values = values[16:]
@@ -615,6 +636,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 			if len(values) < 8 {
 				return dst, fmt.Errorf("reading %v: no values left", tag)
 			}
+			if off+1 >= len(dst.Tape) {
+				return dst, errors.New("tag requires 2 tape slots, but extended beyond tape")
+			}
 			dst.Tape[off] = tagDst
 			dst.Tape[off+1] = binary.LittleEndian.Uint64(values[:8])
 			values = values[8:]
@@ -623,6 +647,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 			// Tape contains full value
 			if len(values) < 16 {
 				return dst, fmt.Errorf("reading %v: no values left", tag)
+			}
+			if off+1 >= len(dst.Tape) {
+				return dst, errors.New("tag requires 2 tape slots, but extended beyond tape")
 			}
 			dst.Tape[off] = binary.LittleEndian.Uint64(values[:8])
 			dst.Tape[off+1] = binary.LittleEndian.Uint64(values[8:16])
@@ -636,10 +663,10 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 				return dst, fmt.Errorf("reading %v: no values left", tag)
 			}
 			// Always forward
-			val := binary.LittleEndian.Uint64(values[:8])
+			rel := binary.LittleEndian.Uint64(values[:8])
 			values = values[8:]
-			val += uint64(off)
-			if val > uint64(len(dst.Tape)) {
+			val := rel + uint64(off)
+			if val < uint64(off) || val == 0 || val > uint64(len(dst.Tape)) {
 				return dst, fmt.Errorf("%v extends beyond tape (%d). offset:%d", tag, len(dst.Tape), val)
 			}
 
@@ -652,10 +679,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 			if len(values) < 8 {
 				return dst, fmt.Errorf("reading %v: no values left", tag)
 			}
-			// Always forward
-			val := binary.LittleEndian.Uint64(values[:8])
+			rel := binary.LittleEndian.Uint64(values[:8])
 			values = values[8:]
-			val += uint64(off)
+			val := rel + uint64(off)
 			if val > uint64(len(dst.Tape)) {
 				return dst, fmt.Errorf("%v extends beyond tape (%d). offset:%d", tag, len(dst.Tape), val)
 			}
@@ -676,6 +702,9 @@ func (s *Serializer) Deserialize(src []byte, dst *ParsedJson) (*ParsedJson, erro
 	if nSkips > 0 {
 		// We owe skips. Add with jumps
 		for i := 0; i < nSkips; i++ {
+			if off >= len(dst.Tape) {
+				return dst, errors.New("skips extended beyond tape")
+			}
 			dst.Tape[off] = (uint64(TagNop) << JSONTAGOFFSET) | uint64(nSkips-i)
 			off++
 		}
@@ -715,6 +744,12 @@ func (s *Serializer) decBlock(br *bytes.Buffer, dst []byte, wg *sync.WaitGroup, 
 		return err
 	}
 	size--
+	if size > uint64(br.Len()) {
+		return fmt.Errorf("block section size (%d) extends beyond input %d", size, br.Len())
+	}
+	if size > uint64(math.MaxInt) {
+		return fmt.Errorf("block section size (%d) too large", size)
+	}
 	compressed := br.Next(int(size))
 	if len(compressed) != int(size) {
 		return errors.New("short block section")
