@@ -1,13 +1,11 @@
 module github.com/minio/simdjson-go/benchmarks
 
-go 1.24
-
-toolchain go1.24.3
+go 1.25
 
 require (
 	github.com/buger/jsonparser v1.1.2
 	github.com/json-iterator/go v1.1.12
-	github.com/klauspost/compress v1.18.7
+	github.com/klauspost/compress v1.20.3
 	github.com/minio/simdjson-go v0.0.0-00010101000000-000000000000
 )
 
