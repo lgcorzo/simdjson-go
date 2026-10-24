@@ -279,7 +279,7 @@ func TestDeserializeSafety(t *testing.T) {
 
 	// Case 1: Corrupted stream where compressed size varint claims to be larger than input buffer
 	corruptStreamSize := []byte{
-		serializedVersion, // Version
+		serializedVersion,            // Version
 		0x80, 0x80, 0x80, 0x80, 0x08, // Compressed size varint = 2147483648
 		0x01, // Tape size = 1
 	}
@@ -290,8 +290,8 @@ func TestDeserializeSafety(t *testing.T) {
 
 	// Case 2: Tape size exceeds max block size limit
 	corruptTapeSize := []byte{
-		serializedVersion, // Version
-		0x0A,             // Comp size = 10
+		serializedVersion,            // Version
+		0x0A,                         // Comp size = 10
 		0xFF, 0xFF, 0xFF, 0xFF, 0x0F, // Tape size = 4294967295
 	}
 	_, err = s.Deserialize(corruptTapeSize, nil)
